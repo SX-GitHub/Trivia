@@ -1,0 +1,25 @@
+﻿@model object
+@{
+	var options = ViewData["options"] as IList<(string, object)>;
+	var selected = options?.FirstOrDefault(option => object.Equals(option.Item2, Model));
+	var id = ViewData["id"] ?? ViewData.ModelMetadata.PropertyName?.ToLower();
+	var classes = ("dropdown-toggle " + (ViewData.TryGetValue("class", out object? additional) ? additional : null))
+		.Split(" ").Where(s => !string.IsNullOrEmpty(s)).Distinct();
+}
+
+@if (options != null)
+{
+<div class="dropdown">
+	<input type="hidden" name="@ViewData.ModelMetadata.PropertyName?.ToLower()" value="@selected?.Item2" />
+	<button id="@id" class="@string.Join(" ", classes)" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+		@selected?.Item1
+	</button>
+	<ul class="dropdown-menu" aria-labelledby="@id">
+	@foreach(var option in options)
+	{
+		<li class="@(option.Item2 == null? "dropdown-item blank" : "dropdown-item")" value="@option.Item2">@option.Item1</li>
+	}
+	</ul>
+</div>
+}
+

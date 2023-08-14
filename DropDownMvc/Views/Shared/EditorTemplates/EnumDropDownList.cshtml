@@ -1,0 +1,33 @@
+﻿@model ValueType
+@{
+	var type = ViewData.ModelMetadata.ModelType;
+	var hasBlank = false;
+	if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>)) {
+		type = type.GetGenericArguments()[0];
+		hasBlank = true;
+	}
+	var options = type.GetEnumValues().OfType<object>()
+		.Select(value => new { Text = type.GetDisplayName(value), Value = value });
+	var selected = options.FirstOrDefault(option => object.Equals(option.Value, Model));
+	var id = ViewData["id"]?? ViewData.ModelMetadata.PropertyName?.ToLower();
+	var classes = ("dropdown-toggle " + (ViewData.TryGetValue("class", out object? additional) ? additional : null))
+		.Split(" ").Where(s => !string.IsNullOrEmpty(s)).Distinct();
+}
+
+<div class="dropdown">
+	<input type="hidden" name="@ViewData.ModelMetadata.PropertyName?.ToLower()" value="@selected?.Value"/>
+	<button type="button" id="@id" name="@id" class="@string.Join(" ", classes)" data-bs-toggle="dropdown" aria-expanded="false">
+		@selected?.Text
+	</button>
+	<ul class="dropdown-menu" aria-labelledby="@id">
+	@if (hasBlank)
+	{
+		<li class="dropdown-item blank" value=""></li>	
+	}
+	@foreach(var option in options)
+	{
+		<li class="dropdown-item" value="@option.Value">@option.Text</li>
+	}
+	</ul>
+</div>
+

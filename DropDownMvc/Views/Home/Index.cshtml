@@ -1,0 +1,122 @@
+﻿@model HomeViewModel
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+<style>
+    /* Functional */
+    .form-control {
+        min-width: 10em;
+    }
+
+    .dropdown-item {
+        min-height: 1.75rem;
+    }
+
+    .dropdown-toggle.form-control {
+        position: relative;
+        text-align: left;
+        min-height: 2.375em;
+    }
+        .dropdown-toggle.form-control::after {
+            position:absolute;
+            top: 1em;
+            right: 0.5em;
+        }
+    /* Decorative */
+        .dropdown-toggle.form-control:focus {
+            box-shadow: none;
+        }
+
+    .dropdown-menu {
+        border: none;
+        box-shadow: 0.2rem 0.2rem 0.4rem rgb(0 0 0 / 0.2);
+    }
+
+    /* Other decorative */
+    .callout {
+        padding: .375rem 1.25rem;
+        box-shadow: 0.2rem 0.2rem 0.4rem rgb(0 0 0 / 0.2);
+        background-color: #eaeded;
+        z-index:5;
+    }
+
+    .callout:before {
+        content: "";
+        display: inline-block;
+        width: 0;
+        height: 0;
+        margin: -0.725em 0.25em -0.725em -2.2em;
+        padding: 0;
+        border-top: 1.15em solid transparent;
+        border-bottom: 1.15em solid transparent;
+        border-right: 1em solid #eaeded;
+    }
+
+    .btn.btn-primary {
+        box-shadow: 0.2rem 0.2rem 0.4rem rgb(0 0 0 / 0.2);
+    }
+
+    main {
+        min-width: 1116px;
+    }
+</style>
+
+<div class="text-center">
+    <h1 class="display-4">DropDownList</h1>
+    @using(Html.BeginForm("Update", "Home", FormMethod.Post))
+    {
+        <div class="row">
+            <div class="col-1">
+                @Html.LabelFor(m => m.Dog, new { @class = "m-2" })
+            </div>
+            <div class="col-2">
+                @Html.DropDownListFor(
+                m => m.Dog,
+                Enum.GetValues<Canine>().Select(s => new SelectListItem{ Text = typeof(Canine).GetDisplayName(s), Value = $"{s}" }),
+                "",
+                htmlAttributes: new { @class = "form-select form-control" })
+            </div>
+            <div class="col-md-auto">
+                <div class="callout callout-info">
+                    &#64;Html.DropDownListFor(m => m.Dog, ... )
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-1">
+                @Html.LabelFor(m => m.Cat, new { @class = "m-2" })
+            </div>
+            <div class="col-2">
+                @Html.EditorFor(m => m.Cat, "EnumDropDownList", new { @class = "form-control" })
+            </div>
+            <div class="col-md-auto">
+                <div class="callout callout-info">
+                    &#64;Html.EditorFor(m => m.Cat, "EnumDropDownList")
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-1">@Html.LabelFor(m => m.Bird, new { @class = "m-2" })</div>
+            <div class="col-2">
+                @Html.EditorFor(m => m.Bird, "DropDownList",
+                new { options = new List<(string, object?)> {
+                ( "American robin", "American robin"),
+                ( "House sparrow", "House sparrow" ),
+                ( "Blue jay", "Blue jay" )
+                }, @class = "form-control" })
+            </div>
+            <div class="col-md-auto">
+                <div class="callout callout-info">
+                    &#64;Html.EditorFor(m => m.Bird, "DropDownList", ...)
+                </div>
+            </div>
+        </div>
+        <br/>
+        <div class="row">
+            <div class="col-1">
+                <input class="btn btn-primary" id="submit" type="submit" value="Submit" />
+            </div>
+        </div>
+    }
+</div>
