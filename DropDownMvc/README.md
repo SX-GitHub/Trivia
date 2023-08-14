@@ -4,7 +4,7 @@ Bootstrap 5 DropDown in .Net Mvc
 
 Do you feel irritating after almost 3 decades of development by the trillion dallor tech industry, you still can't style the dropdown list like everything else in your page? The elegant @Html.DropDownListFor(...) produces a ugly widget doesn't fit in your design aesthetically. Bootstrap has been living with .Net since the early days, somehow it seems @Html.DropDownListFor(...) doesn't know its existence. 
 
-![img](./blobs/sc02.png)
+[<img src="./blobs/sc02.png" width="900"/>](./blobs/sc02.png)
 
 Copying the example of the dropdown from Bootsrap website to your cshtml view? It's not doing it's supposed to do: display the selected value, and add the value to the form being posted to the backend. What is going on?
 
@@ -79,4 +79,4 @@ $(".dropdown-toggle").next(".dropdown-menu").children().on("click", function () 
  
  Here you have it, style the dropdown anyway you like.
 
- ![img](./blobs/sc01.png)
+ [<img src="./blobs/sc01.png" width="900"/>](./blobs/sc01.png)
