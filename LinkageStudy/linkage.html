@@ -2,13 +2,18 @@
 <html lang="en-US">
 <head>
   <meta charset="UTF-8">
-  <title>Linkage: 3-Point Circle, Radius, and Link Drawings</title>
+  <meta name="author" content="SX-GitHub">
+  <!-- Copyright (c) 2025 Shaw Tan, https://github.com/SX-GitHub/Trivia  
+  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: 
+  The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.  
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. -->
+  <title>Linkage Study: Double Action</title>
   <style>
     body { font-family: sans-serif; padding: 0 20px; }
 
     label { 
         margin-right: 10px;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
         display: block; 
     }
 
@@ -115,6 +120,12 @@
         transform: translateX(-82%);
     }
 
+    .slider-container.control {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+    }
+
     #canvas { 
         border: 1px solid black; 
         margin-top: 20px; 
@@ -164,9 +175,21 @@
         </div>
     </label>
   </div>
-  <canvas id="canvas" width="800" height="500"></canvas>
-
+  <div style="position: relative; display: inline-block;">
+    <canvas id="canvas" width="800" height="500"></canvas>
+    <div class="slider-container control">
+        <input type="range" id="angle" min="60" max="120" value="60" step="5" class="slider">
+        <span class="slider-value">60</span>
+    </div>
+  </div>
   <script>
+    const scale = 5;
+    const inc = 5;
+    let canvasWidth = 0, canvasHeight = 0;
+    let data = [];
+    let radius = 0, p = 0, q = 0, minAngle = 0, maxAngle = 0, angle = 0;
+    let center = null, fitting = null;
+
     /**
      * Calculate the coupler point C for angles from min to max (degrees)
      * with increment inc, using:
@@ -179,94 +202,88 @@
      *    y = (q² - p²) / (4 * R * sinθ)
      *    x = R cosθ + sqrt(p² - (y - R sinθ)²)
      */
-    function calculateXY(radius, p, q, min, max, inc = 5) {
-      let points = [];
-      for (let theta = min; theta <= max; theta += inc) {
+    function calculateXY() {     
+      data.length = 0;
+      for (let theta = minAngle; theta <= maxAngle; theta += inc) {
         let thetaRad = theta * Math.PI / 180;
-        let A_x = radius * Math.cos(thetaRad);
-        let A_y = radius * Math.sin(thetaRad);
+        let Ax = radius * Math.cos(thetaRad);
+        let Ay = radius * Math.sin(thetaRad);
+        let Bx = Ax;
+        let By = -Ay;
 
         let sinTheta = Math.sin(thetaRad);
         if (Math.abs(sinTheta) < 1e-6) {
-          points.push([null, null]);
-          continue;
+            continue;
         }
-        let y = (q * q - p * p) / (4 * radius * sinTheta);
-        let diff = y - A_y;
+        let Cy = (q * q - p * p) / (4 * radius * sinTheta);
+        let diff = Cy - Ay;
         let radicand = p * p - diff * diff;
-        if (radicand < 0) {
-          points.push([null, null]);
-        } else {
-          let x = A_x + Math.sqrt(radicand);
-          points.push([x, y]);
+        if (radicand >= 0) {
+            /* Also: Ax + Math.sqrt(radicand) */
+            let Cx = Ax - Math.sqrt(radicand);
+            let At = transform(Ax, Ay);
+            let Bt = transform(Bx, By);
+            let Ct = transform(Cx, Cy);            
+            data.push({ 
+                theta, 
+                radians: thetaRad,
+                A: { x: Ax, y: Ay, canvasX: At.canvasX, canvasY: At.canvasY }, 
+                B: { x: Bx, y: By, canvasX: Bt.canvasX, canvasY: Bt.canvasY }, 
+                C: { x: Cx, y: Cy, canvasX: Ct.canvasX, canvasY: Ct.canvasY } 
+            });
         }
       }
-      return points;
     }
 
     /**
      * Given an array of points [ [x,y], ... ],
      * pick the first, middle, and last valid points and compute
      * the unique circle through them.
-     * Returns { cx, cy, r, p1, p2, p3 } or null.
+     * Returns { x, y, r, canvasX, canvasY } or null.
      */
-    function circleThrough3Points(points) {
-      let validPoints = points.filter(p => p[0] !== null && p[1] !== null);
-      let n = validPoints.length;
-      if (n < 3) return null;
+    function circleThrough3Points() {
+      let n = data.length;
+      if (n < 3) 
+        fitting = null;
 
-      let p1 = validPoints[0];
-      let p3 = validPoints[n - 1];
-      let midIndex = Math.ceil(n / 2) - 1;  // 0-based
-      let p2 = validPoints[midIndex];
+      let p1 = data[0];
+      let p3 = data[n - 1];
+      let p2 = data[Math.ceil(n / 2) - 1];
 
-      const [x1, y1] = p1;
-      const [x2, y2] = p2;
-      const [x3, y3] = p3;
+      const [x1, y1] = [ p1.C.x, p1.C.y ];
+      const [x2, y2] = [ p2.C.x, p2.C.y ];
+      const [x3, y3] = [ p3.C.x, p3.C.y ];
 
-      const D = 2 * (
-        x1 * (y2 - y3) +
-        x2 * (y3 - y1) +
-        x3 * (y1 - y2)
-      );
-      if (Math.abs(D) < 1e-12) {
-        return null;
-      }
+      const D = 2 * ( x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+
+      if (Math.abs(D) < 1e-12) 
+        fitting = null;
 
       const x1sq = x1*x1 + y1*y1;
       const x2sq = x2*x2 + y2*y2;
       const x3sq = x3*x3 + y3*y3;
 
-      const cx = (
-        x1sq * (y2 - y3) +
-        x2sq * (y3 - y1) +
-        x3sq * (y1 - y2)
-      ) / D;
+      const x = ( x1sq * (y2 - y3) + x2sq * (y3 - y1) + x3sq * (y1 - y2) ) / D;
+      const y = ( x1sq * (x3 - x2) + x2sq * (x1 - x3) + x3sq * (x2 - x1) ) / D;
 
-      const cy = (
-        x1sq * (x3 - x2) +
-        x2sq * (x1 - x3) +
-        x3sq * (x2 - x1)
-      ) / D;
-
-      const r = Math.sqrt((x1 - cx)**2 + (y1 - cy)**2);
-
-      return { cx, cy, r, p1, p2, p3 };
+      const r = Math.sqrt((x1 - x)**2 + (y1 - y)**2);
+      const c = transform(x, y);
+      fitting = { x, y, r, canvasX: c.canvasX, canvasY: c.canvasY };
     }
 
     // Transform mechanism (x,y) to canvas coordinates, with (0,0) at canvas center.
-    function transform(x, y, scale, cw, ch) {
-      const canvasX = cw / 2 + x * scale;
-      const canvasY = ch / 2 - y * scale;
+    function transform(x, y) {
+      const canvasX = canvasWidth / 2 + x * scale;
+      const canvasY = canvasHeight / 2 - y * scale;
       return { canvasX, canvasY };
     }
 
     // Draw grid lines every 10 mechanism units.
-    function drawGrid(ctx, scale, cw, ch) {
-      let x_min = -cw / 2 / scale;
-      let x_max = cw / 2 / scale;
-      let y_min = -ch / 2 / scale;
-      let y_max = ch / 2 / scale;
+    function drawGrid(ctx) {
+      let x_min = -canvasWidth / 2 / scale;
+      let x_max = canvasWidth / 2 / scale;
+      let y_min = -canvasHeight / 2 / scale;
+      let y_max = canvasHeight / 2 / scale;
 
       let startX = Math.ceil(x_min / 10) * 10;
       let endX   = Math.floor(x_max / 10) * 10;
@@ -277,16 +294,16 @@
       ctx.lineWidth = 1;
 
       for (let x = startX; x <= endX; x += 10) {
-        let p1 = transform(x, y_min, scale, cw, ch);
-        let p2 = transform(x, y_max, scale, cw, ch);
+        let p1 = transform(x, y_min, scale, canvasWidth, canvasHeight);
+        let p2 = transform(x, y_max, scale, canvasWidth, canvasHeight);
         ctx.beginPath();
         ctx.moveTo(p1.canvasX, p1.canvasY);
         ctx.lineTo(p2.canvasX, p2.canvasY);
         ctx.stroke();
       }
       for (let y = startY; y <= endY; y += 10) {
-        let p1 = transform(x_min, y, scale, cw, ch);
-        let p2 = transform(x_max, y, scale, cw, ch);
+        let p1 = transform(x_min, y, scale, canvasWidth, canvasHeight);
+        let p2 = transform(x_max, y, scale, canvasWidth, canvasHeight);
         ctx.beginPath();
         ctx.moveTo(p1.canvasX, p1.canvasY);
         ctx.lineTo(p2.canvasX, p2.canvasY);
@@ -294,171 +311,200 @@
       }
     }
 
-    // Main drawing function.
-    function drawAll(points, radius, minAngle, maxAngle, p, q) {
-      const canvas = document.getElementById("canvas");
-      const ctx = canvas.getContext("2d");
-      const cw = canvas.width, ch = canvas.height;
-      const scale = 5;
+    function drawAngle(ctx, theta) {
+        const radians = theta * Math.PI / 180;
+        const startAngle = 0;
+        const endAngle = 2 * Math.PI - radians;
+        const offset = 8 * scale;
 
-      ctx.clearRect(0, 0, cw, ch);
-      drawGrid(ctx, scale, cw, ch);
+        ctx.beginPath();
+        ctx.arc(center.canvasX, center.canvasY, offset, startAngle, endAngle, true);
+        ctx.stroke();
+
+        function drawArrow(x, y, angle) {
+            const arrowSize = 7;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-arrowSize, arrowSize / 2);
+            ctx.lineTo(-arrowSize, -arrowSize / 2);
+            ctx.closePath();
+            ctx.fillStyle = '#777';
+            ctx.fill();           
+            ctx.restore();
+        }
+
+        const startX = center.canvasX + offset;
+        const startY = center.canvasY;
+        const endX = center.canvasX + offset * Math.cos(endAngle);
+        const endY = center.canvasY + offset * Math.sin(endAngle);
+        
+        drawArrow(startX, startY, Math.PI / 2 - 0.12);
+        drawArrow(endX, endY, endAngle - Math.PI / 2 + 0.12);
+
+        // Draw the angle θ label
+        const textAngle = -radians / 2;
+        const textRadius = radius + 20;
+
+        const textX = center.canvasX + textRadius * Math.cos(textAngle);
+        const textY = center.canvasY + textRadius * Math.sin(textAngle);
+
+        ctx.font = '14px Arial';
+        ctx.fillText(`${theta}°`, textX + 12, textY - 6);
+
+        // Draw center point (for reference)
+        ctx.beginPath();
+        ctx.arc(center.canvasX, center.canvasY, 2, 0, 2 * Math.PI);
+        ctx.fill();
+    }
+
+    // Main drawing function.
+    function drawAll(canvas) {
+      const ctx = canvas.getContext("2d");
+
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+      drawGrid(ctx);
 
       // Draw the base circle (blue) at the origin with the given radius.
-      let center0 = transform(0, 0, scale, cw, ch);
       ctx.beginPath();
-      ctx.arc(center0.canvasX, center0.canvasY, 3, 0, 2 * Math.PI);
+      ctx.arc(center.canvasX, center.canvasY, 3, 0, 2 * Math.PI);
       ctx.strokeStyle = "#aaa";
       ctx.fillStyle = "#aaa";
       ctx.fill();
       ctx.stroke();
 
-      const angles = [];
-      for (let angle = minAngle; angle <= maxAngle; angle += 5) {
-        let rad = angle * Math.PI / 180;
-        let x = radius * Math.cos(rad);
-        let y = radius * Math.sin(rad);
-        let up = transform(x, y, scale, cw, ch);
-        let lo = transform(x, -y, scale, cw, ch);
-        angles.push({ up, lo });
-      }
+      data.forEach(point => {
+        ctx.beginPath();
+        ctx.arc(point.A.canvasX, point.A.canvasY, 3, 0, 2 * Math.PI);
+        ctx.fillStyle = "#5160c2";
+        ctx.fill();
+        ctx.stroke();
 
-      let maxMark = angles.at(-1);
-      ctx.beginPath();
-      ctx.moveTo(center0.canvasX, center0.canvasY);
-      ctx.lineTo(maxMark.up.canvasX, maxMark.up.canvasY);
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(center0.canvasX, center0.canvasY);
-      ctx.lineTo(maxMark.lo.canvasX, maxMark.lo.canvasY);
-      ctx.lineWidth = 1;
-      ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(point.B.canvasX, point.B.canvasY, 3, 0, 2 * Math.PI);
+        ctx.fillStyle = "#5160c2";
+        ctx.fill();
+        ctx.stroke();        
+        
+        ctx.beginPath();
+        ctx.arc(point.C.canvasX, point.C.canvasY, 3, 0, 2 * Math.PI);
+        ctx.fillStyle = "#777";
+        ctx.fill();
+        ctx.stroke();
+      });
 
       ctx.beginPath();
-      ctx.arc(center0.canvasX, center0.canvasY, radius * scale, 0, 2 * Math.PI);
-      ctx.strokeStyle = "blue";
+      ctx.arc(center.canvasX, center.canvasY, radius * scale, 0, 2 * Math.PI);
+      ctx.strokeStyle = "#5160c2";
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      angles.forEach(angle => {
-        ctx.beginPath();
-        ctx.arc(angle.up.canvasX, angle.up.canvasY, 3, 0, 2 * Math.PI);
-        ctx.fillStyle = "green";
-        ctx.fill();
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(angle.lo.canvasX, angle.lo.canvasY, 3, 0, 2 * Math.PI);
-        ctx.fillStyle = "green";
-        ctx.fill();
-        ctx.stroke();
-      });
-
-      // Draw coupler points (red).
-      points.forEach(pt => {
-        if (pt[0] === null || pt[1] === null) return;
-        let { canvasX, canvasY } = transform(pt[0], pt[1], scale, cw, ch);
-        ctx.beginPath();
-        ctx.arc(canvasX, canvasY, 4, 0, 2 * Math.PI);
-        ctx.fillStyle = "red";
-        ctx.fill();
-        ctx.stroke();
-      });
-
-      // Compute the circle through the first, middle, and last valid points.
-      let c3 = circleThrough3Points(points);
-      if (c3) {
-        let { cx, cy, r, p3 } = c3;
+      if (fitting) {
         // Draw the best-fit circle (purple, dashed).
-        let cxy = transform(cx, cy, scale, cw, ch);
         ctx.beginPath();
         ctx.setLineDash([5, 3]);
-        ctx.arc(cxy.canvasX, cxy.canvasY, r * scale, 0, 2 * Math.PI);
-        ctx.strokeStyle = "purple";
-        ctx.lineWidth = 2;
+        ctx.arc(fitting.canvasX, fitting.canvasY, fitting.r * scale, 0, 2 * Math.PI);
+        ctx.strokeStyle = "#777";
+        ctx.lineWidth = 1;
         ctx.stroke();
         ctx.setLineDash([]);
 
         // Draw center of the best-fit circle.
         ctx.beginPath();
-        ctx.arc(cxy.canvasX, cxy.canvasY, 3, 0, 2 * Math.PI);
-        ctx.fillStyle = "purple";
+        ctx.arc(fitting.canvasX, fitting.canvasY, 3, 0, 2 * Math.PI);
+        ctx.fillStyle = "#777";
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = "purple";
+        ctx.fillStyle = "#777";
         ctx.font = "14px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(`(${cx.toFixed(1)}, ${cy.toFixed(1)})`, cxy.canvasX, cxy.canvasY - 10);
-
-        // Draw a radius line from the circle's center to the last (p3) of the 3 chosen points.
-        let lastPointCanvas = transform(p3[0], p3[1], scale, cw, ch);
-        ctx.beginPath();
-        ctx.moveTo(cxy.canvasX, cxy.canvasY);
-        ctx.lineTo(lastPointCanvas.canvasX, lastPointCanvas.canvasY);
-        ctx.strokeStyle = "purple";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Label the radius near the midpoint of that line.
-        let midRX = (cxy.canvasX + lastPointCanvas.canvasX) / 2;
-        let midRY = (cxy.canvasY + lastPointCanvas.canvasY) / 2;
-        ctx.fillStyle = "purple";
-        ctx.font = "14px sans-serif";
-        ctx.textAlign = "start";
-        ctx.fillText(`r = ${r.toFixed(1)}`, midRX + 5, midRY + 5);
-
-        // --- Draw the link segments for p and q from the last pivot positions ---
-        // For the last angle (maxAngle), compute pivot positions A and B:
-        let thetaLast = maxAngle * Math.PI / 180;
-        let A_last = [radius * Math.cos(thetaLast), radius * Math.sin(thetaLast)];
-        let B_last = [radius * Math.cos(thetaLast), -radius * Math.sin(thetaLast)];
-
-        let pivotA = transform(A_last[0], A_last[1], scale, cw, ch);
-        let pivotB = transform(B_last[0], B_last[1], scale, cw, ch);
-        let couplerLast = transform(p3[0], p3[1], scale, cw, ch);
-
-        // Draw line from pivot A to last coupler point (represents link p).
-        ctx.beginPath();
-        ctx.moveTo(pivotA.canvasX, pivotA.canvasY);
-        ctx.lineTo(couplerLast.canvasX, couplerLast.canvasY);
-        ctx.strokeStyle = "#1abc9c";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Draw line from pivot B to last coupler point (represents link q).
-        ctx.beginPath();
-        ctx.moveTo(pivotB.canvasX, pivotB.canvasY);
-        ctx.lineTo(couplerLast.canvasX, couplerLast.canvasY);
-        ctx.strokeStyle = "#1abc9c";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Label the links with p and q near the midpoints.
-        let midAP = { canvasX: (pivotA.canvasX + couplerLast.canvasX) / 2, canvasY: (pivotA.canvasY + couplerLast.canvasY) / 2 };
-        let midBP = { canvasX: (pivotB.canvasX + couplerLast.canvasX) / 2, canvasY: (pivotB.canvasY + couplerLast.canvasY) / 2 };
-        ctx.fillStyle = "#1abc9c";
-        ctx.font = "14px sans-serif";
-        ctx.fillText(`p = ${p}`, midAP.canvasX + 5, midAP.canvasY - 8);
-        ctx.fillText(`q = ${q}`, midBP.canvasX + 5, midBP.canvasY + 16);
+        ctx.fillText(`(${fitting.x.toFixed(1)}, ${fitting.y.toFixed(1)})`, fitting.canvasX, fitting.canvasY - 10);
+        
+        drawLinkages(ctx);
       }
     }
 
-    function onValueChanged() {
-      const radius = parseFloat(document.getElementById("radius").value);
-      const p = parseFloat(document.getElementById("p").value);
-      const q = parseFloat(document.getElementById("q").value);
-      const minAngle = parseFloat(document.getElementById("minAngle").value);
-      const maxAngle = parseFloat(document.getElementById("maxAngle").value);
+    function drawLinkages(ctx) {
+        let points = data.find(d => d.theta === angle) || null;
+        if (fitting && points) {
+            ctx.beginPath();
+            ctx.moveTo(center.canvasX, center.canvasY);
+            ctx.lineTo(points.A.canvasX, points.A.canvasY);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = "#aaa";
+            ctx.stroke();
 
-      const points = calculateXY(radius, p, q, minAngle, maxAngle);
-      drawAll(points, radius, minAngle, maxAngle, p, q);
+            ctx.beginPath();
+            ctx.moveTo(center.canvasX, center.canvasY);
+            ctx.lineTo(points.B.canvasX, points.B.canvasY);
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            drawAngle(ctx, points.theta);
+
+            // Label the radius near the midpoint of that line.
+            let midRX = (fitting.canvasX + points.C.canvasX) / 2;
+            let midRY = (fitting.canvasY + points.C.canvasY) / 2;
+            ctx.fillStyle = "#1abc9c";
+            ctx.font = "14px sans-serif";
+            ctx.textAlign = "start";
+            ctx.fillText(`r = ${fitting.r.toFixed(1)}`, midRX + 5, midRY + 5);
+
+            // Draw a radius line from the circle's center to the last (p3) of the 3 chosen points.
+            ctx.beginPath();
+            ctx.moveTo(fitting.canvasX, fitting.canvasY);
+            ctx.lineTo(points.C.canvasX, points.C.canvasY);
+            ctx.strokeStyle = "#1abc9c";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw line from pivot A to C point (represents link p).
+            ctx.beginPath();
+            ctx.moveTo(points.A.canvasX, points.A.canvasY);
+            ctx.lineTo(points.C.canvasX, points.C.canvasY);
+            ctx.stroke();
+
+            // Draw line from pivot B to C point (represents link q).
+            ctx.beginPath();
+            ctx.moveTo(points.B.canvasX, points.B.canvasY);
+            ctx.lineTo(points.C.canvasX, points.C.canvasY);
+            ctx.stroke();
+
+            // Label the links with p and q near the midpoints.
+            let midAC = { canvasX: (points.A.canvasX + points.C.canvasX) / 2, canvasY: (points.A.canvasY + points.C.canvasY) / 2 };
+            let midBC = { canvasX: (points.B.canvasX + points.C.canvasX) / 2, canvasY: (points.B.canvasY + points.C.canvasY) / 2 };
+            ctx.fillStyle = "#1abc9c";
+            ctx.font = "14px sans-serif";
+            ctx.fillText(`p = ${p}`, midAC.canvasX + 5, midAC.canvasY - 8);
+            ctx.fillText(`q = ${q}`, midBC.canvasX + 5, midBC.canvasY + 16);
+        }
     }
 
-    const sliders = document.querySelectorAll('.slider');
+    function onValueChanged() {
+      const canvas = document.getElementById("canvas");
+      canvasWidth = canvas.width;
+      canvasHeight = canvas.height;    
+      center = transform(0, 0, scale, canvasWidth, canvasHeight);
+      radius = parseFloat(document.getElementById("radius").value);
+      p = parseFloat(document.getElementById("p").value);
+      q = parseFloat(document.getElementById("q").value);
+      minAngle = parseFloat(document.getElementById("minAngle").value);
+      maxAngle = parseFloat(document.getElementById("maxAngle").value);
 
-    function updateSliderValue(slider) {
+      var control = document.getElementById('angle');
+      control.value = minAngle;
+      control.dispatchEvent(new Event('input'));
+
+      calculateXY();
+      circleThrough3Points();
+      drawAll(canvas);
+    }
+
+    function updateSliderValue(slider, notify = false) {
         const valueLabel = slider.parentElement.querySelector('.slider-value');
         const percent = (slider.value - slider.min) / (slider.max - slider.min);
         const sliderWidth = slider.offsetWidth;
@@ -466,9 +512,11 @@
 
         valueLabel.textContent = slider.value;
         valueLabel.style.left = `calc(${percent * 100}% + ${thumbOffset}px)`;
-        onValueChanged();
+        if (notify)
+            onValueChanged();
     }
 
+    const sliders = [...document.querySelectorAll('.slider')].filter(e => e.id !== 'angle');
     sliders.forEach(slider => {
         const container = slider.parentElement;
         const minLabel = container.querySelector('.slider-min');
@@ -476,11 +524,19 @@
         if (minLabel)
             minLabel.textContent = slider.min;
         if (maxLabel)
-            maxLabel.textContent = slider.max;
+            maxLabel.textContent = slider.max;        
         updateSliderValue(slider); // initial setup
-        slider.addEventListener('input', () => updateSliderValue(slider));
-        window.addEventListener('resize', () => updateSliderValue(slider));
+        slider.addEventListener('input', () => updateSliderValue(slider, notify = true));
+    });   
+
+    document.getElementById('angle').addEventListener('input', (event) => {
+        updateSliderValue(event.target);
+        angle = parseFloat(event.target.value);
+        const canvas = document.getElementById("canvas");
+        drawAll(canvas);
     });
+    
+    onValueChanged();
   </script>
 </body>
 </html>
