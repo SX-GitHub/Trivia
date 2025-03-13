@@ -126,6 +126,18 @@
         right: 20px;
     }
 
+    .error {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;       
+        font-weight: 700;
+        font-style: italic;
+    }
+
+    #error.out {
+        color: red;
+    }
+
     #canvas { 
         border: 1px solid black; 
         margin-top: 20px; 
@@ -177,12 +189,14 @@
   </div>
   <div style="position: relative; display: inline-block;">
     <canvas id="canvas" width="800" height="500"></canvas>
+    <div class="error">error ≤ <span id="error"></span> mm</div>
     <div class="slider-container control">
         <input type="range" id="angle" min="60" max="120" value="60" step="5" class="slider">
         <span class="slider-value">60</span>
     </div>
   </div>
   <script>
+    const tolerance = 0.4;
     const scale = 5;
     const inc = 5;
     let canvasWidth = 0, canvasHeight = 0;
@@ -235,6 +249,33 @@
       }
     }
 
+    function calculateDistanceFromCircle() {
+        let maxDistance = -Infinity;
+        let furthestPoint = null;
+
+        data.forEach(point => {
+            // Calculate Euclidean distance from circle center to the point
+            const dx = point.C.x - fitting.x;
+            const dy = point.C.y - fitting.y;
+            const distanceToCenter = Math.sqrt(dx * dx + dy * dy);
+
+            // Distance from the circle's perimeter
+            const distanceFromCircle = Math.abs(distanceToCenter - fitting.r);
+
+            if (distanceFromCircle > maxDistance) {
+                maxDistance = distanceFromCircle;
+                furthestPoint = point;
+            }
+        });
+
+        const error = document.getElementById('error');
+        error.classList.remove('out');
+        error.textContent = `${maxDistance.toFixed(2)}`;
+        if (maxDistance > tolerance) {
+            error.classList.add('out');
+        }
+    }
+
     /**
      * Given an array of points [ [x,y], ... ],
      * pick the first, middle, and last valid points and compute
@@ -269,6 +310,7 @@
       const r = Math.sqrt((x1 - x)**2 + (y1 - y)**2);
       const c = transform(x, y);
       fitting = { x, y, r, canvasX: c.canvasX, canvasY: c.canvasY };
+      calculateDistanceFromCircle();
     }
 
     // Transform mechanism (x,y) to canvas coordinates, with (0,0) at canvas center.
