@@ -538,7 +538,9 @@
       maxAngle = parseFloat(document.getElementById("maxAngle").value);
 
       var control = document.getElementById('angle');
+      control.min = minAngle;
       control.value = minAngle;
+      control.max = maxAngle;
       control.dispatchEvent(new Event('input'));
 
       calculateXY();
