@@ -140,8 +140,52 @@
 
     #canvas { 
         border: 1px solid black; 
-        margin-top: 20px; 
+        transform-origin: center center;
+        transition: transform 0.1s ease-in-out;
+    }
+
+    #drawing {
+        position: relative;
+        width: fit-content;
+    }
+
+    #canvasContainer {
+        position: relative; 
+        display: flex;
+        width: 800px;
+        height: 500px;
+        overflow: hidden;
+        align-items: center;      /* Vertical centering */
+        justify-content: center; 
         box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4);
+        margin: 20px 0;
+    }
+
+    #drag {
+        position: absolute;
+        bottom: -18px;
+        right: -18px;          
+        z-index: 10;
+    }
+
+    #drag path {
+        fill: #1c527e; 
+    }
+
+    #drag:hover path {
+        fill: #1abc9c; 
+    }
+
+    #angleDisplay {
+        position: absolute;
+        bottom: -28px;
+        right: -64px;
+        font-size: 14px;
+        font-style: italic;
+        text-align: left;
+        width: 50px;
+        user-select: none;
+        color: #777;
     }
   </style>
 </head>
@@ -158,7 +202,7 @@
     </label>
     <label><span class="label-text symbol">p:</span>
         <div class="slider-container">
-            <input type="range" id="p" min="20" max="70" value="28" class="slider">
+            <input type="range" id="p" min="12" max="70" value="28" class="slider">
             <span class="slider-min"></span>
             <span class="slider-value"></span>
             <span class="slider-max"></span>
@@ -166,7 +210,7 @@
     </label>
     <label><span class="label-text symbol">q:</span> 
         <div class="slider-container">
-            <input type="range" id="q" min="20" max="70" value="42" class="slider">
+            <input type="range" id="q" min="12" max="70" value="42" class="slider">
             <span class="slider-min"></span>
             <span class="slider-max"></span>
             <span class="slider-value"></span>
@@ -187,23 +231,39 @@
         </div>
     </label>
   </div>
-  <div style="position: relative; display: inline-block;">
-    <canvas id="canvas" width="800" height="500"></canvas>
-    <div class="error">error ≤ <span id="error"></span> mm</div>
-    <div class="slider-container control">
-        <input type="range" id="angle" min="60" max="120" value="60" step="5" class="slider">
-        <span class="slider-value">60</span>
+  <div id="drawing">
+    <div id="canvasContainer">
+        <canvas id="canvas" width="1000" height="1000"></canvas>
+        <div class="error">error ≤ <span id="error"></span> mm</div>
+        <div class="slider-container control">
+            <input type="range" id="angle" min="60" max="120" value="60" step="5" class="slider">
+            <span class="slider-value">60</span>
+        </div>
     </div>
+    <svg id="drag" width="16" height="16" viewBox="0 0 32 32">
+        <g transform="rotate(-90 16 16) scale(0.06524)">
+        <path d="M483.248,366.926l-97.8-88.4c-8.3-8.3-21.8-7.3-29.1,1c-8.3,8.3-7.3,21.8,1,29.1l58,52h-32
+        c-139.4,0-252.8-113.4-252.8-252.8v-33l52,58c8.3,8.3,20.8,8.3,29.1,1c8.3-8.3,8.3-20.8,1-29.1l-88.4-97.8
+        c-7.3-8.3-22.9-8.3-30.2,0l-88.3,97.9c-8.3,8.3-7.3,21.8,1,29.1c10.9,8.8,25.1,5.3,30.2-1l52-58v33
+        c0,162.3,131.1,293.4,293.4,293.4h34.2l-59.1,53.1c-8.3,8.3-8.3,20.8-1,29.1c11,10.2,24.9,5.8,29.1,1l97.8-86.3
+        C492.748,390.626,492.848,376.326,483.248,366.926z"/>
+        </g>
+    </svg>
+    <div id="angleDisplay">0°</div>
   </div>
+  <!-- <label>
+    <input type="range" id="rotateSlider" min="-45" max="45" value="0"/>
+    <span id="angleDisplay">0°</span>  
+  </label>   -->
   <script>
     const tolerance = 0.4;
     const scale = 5;
     const inc = 5;
-    let canvasWidth = 0, canvasHeight = 0;
+    let canvasWidth = 0, canvasHeight = 0, canvasX = 0, canvasY = 0, canvasCornerRadians = 0.0;
     let data = [];
     let radius = 0, p = 0, q = 0, minAngle = 0, maxAngle = 0, angle = 0;
     let center = null, fitting = null;
-
+    
     /**
      * Calculate the coupler point C for angles from min to max (degrees)
      * with increment inc, using:
@@ -331,13 +391,13 @@
       let endX   = Math.floor(x_max / 10) * 10;
       let startY = Math.ceil(y_min / 10) * 10;
       let endY   = Math.floor(y_max / 10) * 10;
-
-      ctx.strokeStyle = "#ccc";
+      
       ctx.lineWidth = 1;
 
       for (let x = startX; x <= endX; x += 10) {
         let p1 = transform(x, y_min, scale, canvasWidth, canvasHeight);
         let p2 = transform(x, y_max, scale, canvasWidth, canvasHeight);
+        ctx.strokeStyle = x == 0? "#999" : "#ccc";
         ctx.beginPath();
         ctx.moveTo(p1.canvasX, p1.canvasY);
         ctx.lineTo(p2.canvasX, p2.canvasY);
@@ -346,6 +406,7 @@
       for (let y = startY; y <= endY; y += 10) {
         let p1 = transform(x_min, y, scale, canvasWidth, canvasHeight);
         let p2 = transform(x_max, y, scale, canvasWidth, canvasHeight);
+        ctx.strokeStyle = y == 0? "#999" : "#ccc";
         ctx.beginPath();
         ctx.moveTo(p1.canvasX, p1.canvasY);
         ctx.lineTo(p2.canvasX, p2.canvasY);
@@ -526,10 +587,19 @@
         }
     }
 
+    function getMouseAngle(mouseX, mouseY) {
+        const centerX = canvasX + canvasWidth / 2;
+        const centerY = canvasY + canvasHeight / 2;
+
+        const dx = mouseX - centerX;
+        const dy = mouseY - centerY;
+
+        const angleRadians = Math.atan2(dy, dx) - canvasCornerRadians; 
+        const angleDegrees = angleRadians * (180 / Math.PI);
+        return Math.round(angleDegrees * 10) / 10;
+    }
+
     function onValueChanged() {
-      const canvas = document.getElementById("canvas");
-      canvasWidth = canvas.width;
-      canvasHeight = canvas.height;    
       center = transform(0, 0, scale, canvasWidth, canvasHeight);
       radius = parseFloat(document.getElementById("radius").value);
       p = parseFloat(document.getElementById("p").value);
@@ -576,10 +646,49 @@
     document.getElementById('angle').addEventListener('input', (event) => {
         updateSliderValue(event.target);
         angle = parseFloat(event.target.value);
-        const canvas = document.getElementById("canvas");
         drawAll(canvas);
+    });    
+
+    document.getElementById('drag').addEventListener('mousedown', function(event) {
+        event.preventDefault();
+        return dragging = true; 
     });
-    
+
+    document.getElementById('drag').addEventListener('dblclick', function(event) {
+        event.preventDefault();
+        canvasAngle = 0;
+        document.getElementById('canvas').style.transform = `rotate(0deg)`;
+        document.getElementById('angleDisplay').textContent = '0°';
+    });
+
+    window.addEventListener('mousemove', function(event) {
+        if (dragging === true) {
+            event.preventDefault();
+            var mouseX = event.clientX, mouseY = event.clientY;
+            var angle = getMouseAngle(mouseX, mouseY);
+            if (angle != canvasAngle) {
+                document.getElementById('canvas').style.transform = `rotate(${angle}deg)`;
+                canvasAngle = angle;
+                document.getElementById('angleDisplay').textContent = `${-angle}°`;
+            }
+        }
+    });
+
+    window.addEventListener('mouseup', function(event) {
+        event.preventDefault();
+        return dragging = false;
+    });
+
+    const canvas = document.getElementById("canvas");
+    canvasWidth = canvas.width;
+    canvasHeight = canvas.height;
+    canvasX = canvas.offsetLeft;
+    canvasY = canvas.offsetTop;
+    canvasCornerRadians = Math.acos(500/800);
+
+    var dragging = false;
+    var canvasAngle = 0;
+
     onValueChanged();
   </script>
 </body>
